@@ -1,0 +1,428 @@
+---
+title: "Project Metoper"
+author: "Hayatul Husnah Sopiani - 22/497083/PA/21395"
+date: "2024-06-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ggplot2)
+library(forecast)
+library(tseries)
+library(lmtest)
+```
+
+```{r}
+data<-read.csv("C:/Users/Mas Win/Downloads/per-capita-meat-consumption-by-type-kilograms-per-year.csv", header = T)
+data
+```
+
+```{r}
+data_brazil <- subset(data, Entity == "Brazil")
+data_brazil
+```
+
+
+```{r}
+# Mengubah kolom kedua menjadi time series dengan frekuensi tahunan
+data_brazil <- ts(data_brazil$Meat..pig...00002733....Food.available.for.consumption...0645pc....kilograms.per.year.per.capita, start = 1961, frequency = 1)
+print(data_brazil)
+```
+
+```{r}
+autoplot(data_brazil)+xlab("Waktu (Tahun)") +
+ylab("Jumlah Konsumsi (kg/year)") +
+ggtitle("Plot Data Konsumsi Daging Babi di Brazil") + geom_point()
+```
+```{r}
+adf.test(data_brazil)
+```
+```{r}
+#Transforming Data
+##Checking the Number of Differences Required
+ndiffs(log(data_brazil),"adf")
+```
+```{r}
+##Diff 1
+ddif1 = diff(data_brazil, differences=1)
+adf.test(ddif1)
+autoplot(ddif1)
+```
+```{r}
+##Diff 2
+ddif2 = diff(data_brazil, differences=2)
+adf.test(ddif2)
+autoplot(ddif2)
+```
+
+```{r}
+#Diff 1 with Log-Trans
+dtrans1 = diff(log(data_brazil), differences=1)
+adf.test(dtrans1)
+autoplot(dtrans1)
+```
+```{r}
+#Diff 2 with Log-Trans
+dtrans2 = diff(log(data_brazil), differences=2)
+adf.test(dtrans2)
+autoplot(dtrans2)
+```
+
+nilai dtrans2 mutlak lebih besar, sehingga digunakan dtrans untuk identifikasi model
+```{r}
+#Membuat Plot ACF dan PACF
+ggAcf(dtrans2,lag.max = 12) + ggtitle("ACF")
+ggPacf(dtrans2,lag.max = 12) + ggtitle("PACF")
+```
+diketahui nilai p= 1, d=2, q=1
+
+# Estimasi Model
+
+Akan dibuat estimasi model untuk model-model berikut:
+tanpa konstanta: tc121, tc120, tc021
+
+```{r}
+tc121<-Arima(data_brazil,order=c(1,2,1),include.constant = F, lambda = 0)
+coeftest(tc121)
+```
+
+```{r}
+tc120<-Arima(data_brazil,order=c(1,2,0),include.constant = F, lambda = 0)
+coeftest(tc120)
+```
+
+```{r}
+tc021<-Arima(data_brazil,order=c(0,2,1),include.constant = F, lambda = 0)
+coeftest(tc021)
+```
+tc120, tc 021
+
+
+
+
+```{r}
+# Import Library
+library(ggplot2)
+library(forecast)
+library(tseries)
+library(lmtest)
+```
+
+```{r}
+tc120<-Arima(data_brazil,order=c(1,2,0),include.constant = F, lambda = 0)
+tc021<-Arima(data_brazil,order=c(0,2,1),include.constant = F, lambda = 0)
+```
+#Diagnostic Checking
+#TC120
+
+```{r}
+Box.test(tc120$residuals,type="Ljung") #uji autokorelasi
+Box.test((tc210$residuals)^2,type="Ljung") #uji homoskedastik
+jarque.bera.test(tc120$residuals) #uji normalitas
+checkresiduals(tc120)
+```
+Model tc120 ini memiliki residual yang bersifat tidak terdapat autokorelasi, homoskedastik, dan residualnya
+berdistribusi normal.
+
+#TC021
+
+```{r}
+Box.test(tc021$residuals,type="Ljung") #uji autokorelasi
+Box.test((tc021$residuals)^2,type="Ljung") #uji homoskedastik
+jarque.bera.test(tc021$residuals) #uji normalitas
+checkresiduals(tc021)
+```
+Model tc021 ini memiliki residual yang bersifat tidak terdapat autokorelasi, homoskedastik, dan residualnya tidak
+berdistribusi normal.
+
+
+```{r}
+#Best model selection
+tc120
+tc021
+mod_tc120 = data.frame(Model = "tc120", LogLik = logLik(tc120), AIC = AIC(tc120), BIC = BIC(tc120))
+mod_tc021 = data.frame(Model = "tc021", LogLik = logLik(tc021), AIC = AIC(tc021), BIC = BIC(tc021))
+
+model_selection = rbind(mod_tc120, mod_tc021)
+model_selection
+```
+
+Terlihat model terbaik ialah model tc021 karena pada model ini memiliki tingkat kesesuaian tertinggi dengan syarat daripada model yang lainnya
+dimana tiga aspek terpenuhi yaitu nilai Log-Likelihood terbesar dan BIC AIC terkecil.
+
+```{r}
+#Best model
+##Plot##
+autoplot(tc021$x, col="darkblue") + 
+  autolayer(fitted(tc021), series = "Data Ramalan") + 
+  ylab("Jumlah Produksi") + 
+  ggtitle("Plot Data Asli vs Ramalan")
+```
+
+#Forecast dengan model terbaik
+```{r}
+accuracy(tc021)
+forecast(tc021,5)
+```
+# GET THE BEST ORDE IS ARIMA (nc011)
+
+```{r}
+# FORECASTING INDONESIA DATA WITH GGPLOT2
+model_brazil <- Arima(data_brazil,order=c(0,2,1),include.constant = F, lambda = 0)
+forecast_brazil <- forecast(model_brazil, h = 5)
+autoplot(forecast_brazil) + autolayer(data_brazil, series = "Data") + xlab("Year") + ylab("Kilograms per year") + ggtitle("Forecasting ARIMA (0,2,1) ")
+```
+
+```{r}
+install.packages("timeSeries")
+```
+
+```{r}
+library(timeSeries)
+library(tseries)
+library(forecast)
+library(ggplot2)
+library(TSstudio)
+library(quantmod)
+```
+
+```{r}
+data_iceland <- subset(data, Entity =="Iceland")
+data_iceland
+```
+
+```{r}
+data_iceland <- ts(data_iceland$Meat..pig...00002733....Food.available.for.consumption...0645pc....kilograms.per.year.per.capita, start = 1961, frequency = 1)
+print(data_iceland)
+```
+
+```{r}
+autoplot(data_iceland)+xlab("Waktu (Tahun)") +
+ylab("Jumlah Produksi") +
+ggtitle("Plot Data Asli") + geom_point()
+```
+
+```{r}
+adf.test(data_iceland)
+```
+
+```{r}
+#Transforming Data
+##Checking the Number of Differences Required
+ndiffs(log(data_iceland),"adf")
+```
+
+```{r}
+##Diff 1
+ddif1 = diff(data_iceland, differences=1)
+adf.test(ddif1)
+autoplot(ddif1)
+```
+```{r}
+#Diff 1 with Log-Trans
+dtrans1 = diff(log(data_iceland), differences=1)
+adf.test(dtrans1)
+autoplot(dtrans1)
+```
+
+```{r}
+#Membuat Plot ACF dan PACF
+ggAcf(dtrans1,lag.max = 12) + ggtitle("ACF")
+ggPacf(dtrans1,lag.max = 12) + ggtitle("PACF")
+```
+tidak bisa menggunakan ARIMA
+
+```{r}
+naive.method <- naive(data_iceland,h=5) #peramalan
+naive.method
+```
+
+```{r}
+accuracy(naive.method) #ukuran ketepatan nilai peramalan
+autoplot(naive.method) + theme_classic() #plot data ramalan
+```
+```{r}
+#plot data asli dan ramalan
+plot(naive.method$x,col="blue",lwd=1.0, xlab="Tahun", ylab="Produksi", main="Plot Data Asli vs Fitting Naive Method")
+lines(naive.method$fitted,col="red",lwd=2.0)
+legend("topleft", c("Data Asli", "Hasil Naive Method"), bty="n", lwd=c(1.0,2.0), col=c("blue", "red"))
+```
+
+```{r}
+k=5 #mendefinisikan nilai k
+n=length(data_iceland)
+MA=array(NA,dim=c(n)) # inisiasi MA
+```
+
+```{r}
+# perulangan untuk forecast rata-rata bergerak tunggal
+for(i in 1:n){
+  MA[i+(k-1)]=mean(data_iceland[i:(i+(k-1))])
+}
+#Hitung DMA dengan orde m
+m=3 #mendefinisikan nilai m
+DMA=array(NA,dim=c(n)) #inisiasi DMA
+# perulangan untuk forecast rata-rata bergerak ganda
+for(i in 1:n){
+  DMA[i+(m-1)+(k-1)]=mean(MA[(i+(k-1)):(i+(m-1)+(k-1))])
+}
+#Hitung koefisien at
+at=array(NA,dim=c(n))
+for(i in 1:n){
+  at[i+(m-1)+(k-1)]=2*MA[i+(m-1)+(k-1)]-DMA[i+(m-1)+(k-1)]
+}
+#Hitung koefisien bt
+bt=array(NA,dim=c(n))
+for(i in 1:n){
+  bt[i+(m-1)+(k-1)]=(2/(k-1))*(MA[i+(m-1)+(k-1)]-DMA[i+(m-1)+(k-1)])
+}
+# nilai prediksi
+Prediksi=array(NA,dim=c(n))
+for(i in 1:n){
+  Prediksi[i+(m-1)+(k-1)+2]=at[i+(m-1)+(k-1)]+bt[i+(m-1)+(k-1)]*2
+}
+# nilai error
+e=array(NA,dim=c(n))
+for(i in 1:n){
+  e[i]=(data_iceland[i+(m-1)+(k-1)+2]-Prediksi[i+(m-1)+(k-1)+2])^2
+}
+MSE.dma=mean(e,na.rm=TRUE) #nilai MSE, na.rm=TRUE -> missing value dihilangkan
+RMSE.dma = sqrt(MSE.dma) #nilai RMSE
+forecast.error.dma <- data.frame('MSE'=MSE.dma, 'RMSE'=RMSE.dma) #membentuk data frame hasil MSE dan RMSE
+forecast.error.dma
+```
+
+```{r}
+# melakukan peramalan
+forecast.ts=function(h,N){
+  at[n-h]+bt[n-h]*N
+}
+# ramalan 5 (t=5) periode kedepan
+t=5
+ramalan=ts(forecast.ts(t-1:t,t))
+ramalan
+```
+
+```{r}
+# data time series
+Prediksi=ts(Prediksi, start=c(1961), freq=1)
+Ramalan=ts(ramalan, start=c(1961), freq=1)
+Ramalan
+```
+
+```{r}
+# plot ramalan
+plot(data_iceland,col="black",lwd=1.0, xlab="Tahun", ylab="Produksi", main="Plot Data Asli vs Ramalan DMA")
+limitDate=end(data_iceland)[1]+(end(data_iceland)[2]-1)/frequency(data_iceland)
+abline(v=limitDate ,lty=4)
+lines(Ramalan,col="blue", lwd=2)
+legend("topleft", c("Data Asli", "Ramalan DMA"), bty="n", lwd=2, col=c("black", "blue"))
+```
+
+```{r}
+# plot fitting
+plot(data_iceland,col="blue",lwd=1.0, xlab="Tahun", ylab="Harga", main="Plot Data Asli vs Fitting DMA")
+lines(Prediksi, col="red", lwd=2)
+legend("topleft", c("Data Asli", "Hasil DMA"), bty="n", lwd=2, col=c("blue", "red"))
+```
+
+```{r}
+# Definisikan fungsi Holt dengan parameter h untuk prediksi lebih dari satu periode
+holt_manual <- function(y, Alpha, Gamma, h = 1, start = y[1]){
+  n <- length(y)
+  st_par <- numeric(n + h)  # Ubah menjadi n + h untuk menyimpan ramalan tambahan
+  bt_par <- numeric(n + h)  # Ubah menjadi n + h untuk menyimpan ramalan tambahan
+  forecast <- numeric(n + h)
+  error <- numeric(n + h)
+
+  # Inisialisasi nilai s1 dan b1
+  st_par[1] <- start
+  bt_par[1] <- y[2] - y[1]
+
+  # Perhitungan Holt's Linear Trend
+  for (i in 2:(n + h)) {  # Ubah menjadi 2:(n + h) untuk menyimpan ramalan tambahan
+    st_par[i] <- Alpha * y[i - 1] + (1 - Alpha) * (st_par[i - 1] + bt_par[i - 1])
+    bt_par[i] <- Gamma * (st_par[i] - st_par[i - 1]) + (1 - Gamma) * bt_par[i - 1]
+  }
+
+  # Menghitung ramalan untuk periode data asli dan tambahan
+  for (i in 1:(n + h)) {
+    if (i <= n) {
+      forecast[i] <- st_par[i] + bt_par[i]
+      error[i] <- (y[i] - forecast[i])^2
+    } else {
+      forecast[i] <- st_par[n] + (i - n) * bt_par[n]
+      error[i] <- NA  # Ramalan di luar periode data asli, sehingga error diisi NA
+    }
+  }
+
+  # Menyusun dalam data frame
+  df <- data.frame(
+    Data = c(y, rep(NA, h)),  # Data asli ditambah NA untuk ramalan tambahan
+    St = st_par,  # Nilai St sesuai dengan panjang data + h
+    Bt = bt_par,  # Nilai Bt sesuai dengan panjang data + h
+    Forecast = forecast,  # Ramalan untuk data asli dan tambahan
+    Error = error  # Error untuk data asli dan ramalan tambahan
+  )
+
+  return(df)  # Mengembalikan data frame hasil peramalan
+}
+```
+
+```{r}
+# Definisikan rentang nilai Alpha dan Gamma
+alpha_values <- seq(0.1, 0.9, by = 0.1)
+gamma_values <- seq(0.1, 0.9, by = 0.1)
+
+# Tempat untuk menyimpan hasil RMSE
+results <- data.frame(Alpha = numeric(0), Gamma = numeric(0), RMSE = numeric(0))
+
+# Fungsi untuk menghitung RMSE
+calculate_rmse <- function(errors) {
+  sqrt(mean(errors, na.rm = TRUE))
+}
+
+# Loop untuk grid search
+for (alpha in alpha_values) {
+  for (gamma in gamma_values) {
+    model <- holt_manual(data_iceland, Alpha = alpha, Gamma = gamma, h = 5)
+    rmse <- calculate_rmse(model$Error)
+    results <- rbind(results, data.frame(Alpha = alpha, Gamma = gamma, RMSE = rmse))
+  }
+}
+
+# Menemukan kombinasi Alpha dan Gamma dengan RMSE terkecil
+optimal_params <- results %>% filter(RMSE == min(RMSE))
+optimal_params
+```
+
+```{r}
+# Menggunakan nilai Alpha dan Gamma yang optimal untuk membuat prediksi
+best.holt <- holt_manual(data_iceland, Alpha = optimal_params$Alpha, Gamma = optimal_params$Gamma, h = 5)
+RMSE.best.holt <- sqrt(mean(best.holt$Error, na.rm = TRUE))
+
+# Fungsi untuk menampilkan hasil forecast beserta Alpha, Gamma, dan RMSE paling optimal
+result_holt <- function(model, RMSE, Alpha, Gamma) {
+  print(model)
+  cat("\n-----------------\n")
+  cat("RMSE =", RMSE, "\n")
+  cat("Alpha =", Alpha, "\n")
+  cat("Gamma =", Gamma, "\n")
+}
+
+result.holt(best.holt, RMSE.best.holt, optimal_params$Alpha, optimal_params$Gamma) # Hasil
+```
+
+```{r}
+##### Data Time Series #####
+data.plot <- ts(best.holt$Data, start = c(1961), freq = 1) # Membuat data menjadi bentuk timeseries
+forecast.holt <- ts(best.holt$Forecast, start = c(1961), freq = 1)
+##### Plot Data #####
+plot(data.plot, type = "l", col = "blue", lwd = 2, xlab = "Tahun", ylab = "Mining", main = "Plot Data Asli dan Ramalan 2 Parameter Holt")
+lines(forecast.holt, col = "red", lwd = 2)
+legend("topleft", c("Asli", "Ramalan"), bty = "n", lwd = 2, col = c("blue", "red"))
+```
